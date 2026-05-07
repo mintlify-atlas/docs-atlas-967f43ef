@@ -1,0 +1,100 @@
+---
+title: "POST /comparar — Compare Data Against AEMET"
+description: "Compare a stored manual climate record for a given municipality against the current live AEMET reading and receive per-field deviation values."
+---
+
+The `/comparar` route looks up the most recent manually stored record for a given municipality, fetches the current live reading from AEMET for the same location, and returns the numeric difference between the two for each shared measurement field. This makes it easy to identify how much local observations deviate from the official AEMET baseline. A `GET` request loads the comparison form with no result. A `POST` request triggers the comparison and renders the result alongside the form.
+
+## Request
+
+### GET — load the form
+
+```http
+GET /comparar
+```
+
+Returns the `comparar.html` template with `resultado` set to `null`. No comparison is performed.
+
+### POST — run the comparison
+
+```http
+POST /comparar
+Content-Type: application/x-www-form-urlencoded
+```
+
+<ParamField body="municipio" type="string" required>
+  Name of the municipality to compare. Must match the `municipio` value stored in at least one manual record exactly. Example: `"Madrid"`.
+</ParamField>
+
+<ParamField body="fecha" type="string">
+  Optional date filter in `YYYY-MM-DD` format. When provided, only manual records matching this date are considered as the comparison baseline. Leave blank to use the most recent record for the municipality regardless of date.
+</ParamField>
+
+<Warning>
+  At least one manual record must exist for the specified municipality before a comparison can be performed. If no matching record is found, the response will include `"success": false` with an explanatory message.
+</Warning>
+
+### Example request
+
+```bash
+curl -X POST "http://localhost:5000/comparar" \
+  -d "municipio=Madrid&fecha=2026-05-07"
+```
+
+## Response
+
+The endpoint renders `comparar.html` and passes a `resultado` object to the template. When the comparison succeeds, the object contains the stored values, the live AEMET values, and the calculated deviation for each field.
+
+### Success
+
+```json
+{
+  "success": true,
+  "municipio": "Madrid",
+  "fecha": "07/05/2026",
+  "manual": {
+    "temperatura": 28.5,
+    "humedad": 62.0,
+    "viento": 15.0,
+    "lluvia": 0.0
+  },
+  "api": {
+    "temperatura": 25.1,
+    "humedad": 55.0,
+    "viento": 12.0,
+    "lluvia": 0.0,
+    "fuente": "AEMET (Oficial)"
+  },
+  "diferencias": {
+    "temperatura": 3.4,
+    "humedad": 7.0,
+    "viento": 3.0,
+    "lluvia": 0.0
+  },
+  "hay_discrepancia": true
+}
+```
+
+Deviation values are the **absolute difference** between the two readings (`abs(manual − aemet)`), so they are always non-negative. The `hay_discrepancia` boolean is `true` when any deviation exceeds its threshold (temperature > 3 °C, humidity > 10%, wind > 10 km/h, rain > 5 mm).
+
+### Failure — missing municipality field
+
+```json
+{
+  "success": false,
+  "message": "Debes introducir un municipio para comparar."
+}
+```
+
+### Failure — no stored record found
+
+```json
+{
+  "success": false,
+  "message": "No se encontró ningún registro manual para el municipio indicado."
+}
+```
+
+<Note>
+  Comparisons are always between a **manual** record (`"fuente": "manual"`) and the live AEMET reading. AEMET-sourced records stored via `/api/clima` are not used as the baseline for this comparison.
+</Note>

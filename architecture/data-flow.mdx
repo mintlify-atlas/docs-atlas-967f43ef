@@ -1,0 +1,113 @@
+---
+title: "Real-Time and Manual Data Flow"
+description: "Traces each step a weather reading takes — from GPS coordinates or a user form through AEMET, normalization, alert evaluation, and JSON persistence."
+---
+
+ClimApp handles two distinct data paths: an automatic real-time path driven by the user's GPS coordinates and a manual path where users submit their own measurements. Both paths converge at the same normalization and persistence layer, ensuring that every record stored in the system shares a consistent schema regardless of its origin.
+
+<Tabs>
+  <Tab title="Real-Time Weather">
+    <Steps>
+      <Step title="Browser reads GPS coordinates">
+        The browser loads `index.html`. JavaScript immediately calls `navigator.geolocation.getCurrentPosition()`, prompting the user to allow location access. No data is fetched until the browser has confirmed coordinates.
+      </Step>
+      <Step title="Browser sends coordinates to the API">
+        Once latitude and longitude are available, a JavaScript `fetch` call fires:
+
+        ```http
+        GET /api/clima?lat=40.4168&lon=-3.7038
+        ```
+
+        The page does not reload — the UI updates in place once the response arrives.
+      </Step>
+      <Step title="api_controller receives and validates the request">
+        `api_controller.py` reads the `lat` and `lon` query parameters. If either is missing it returns a `400` error immediately. Otherwise it forwards both values to the service layer:
+
+        ```python api_controller.py
+        raw_data = obtener_clima_por_coordenadas(lat, lon)
+        ```
+      </Step>
+      <Step title="WeatherAPIService sends the first request to AEMET">
+        `WeatherAPIService._obtener_datos_crudos()` sends a `GET` request to AEMET's observation endpoint with the API key in the headers:
+
+        ```text
+        https://opendata.aemet.es/opendata/api/observacion/convencional/todas
+        ```
+
+        AEMET responds with a metadata JSON containing a `datos` field — a short-lived temporary URL where the actual observation payload is stored.
+      </Step>
+      <Step title="Second request downloads the observation payload">
+        A second `GET` is sent immediately to the temporary URL from the previous step. This two-step handshake is how AEMET's API works; both requests are wrapped in a `RetryService` session that retries up to three times with exponential back-off on HTTP 429, 500, 502, 503, and 504 errors.
+      </Step>
+      <Step title="Haversine algorithm finds the nearest station">
+        `WeatherAPIService.obtener_clima_por_coordenadas()` iterates over every observation returned by AEMET. For each station it calls `calcular_distancia()` from `utils/helpers.py`, which implements the Haversine formula to compute great-circle distance in kilometres between the user's coordinates and the station's coordinates. The observation with the smallest distance is selected.
+      </Step>
+      <Step title="normalizer_service maps raw fields to the standard schema">
+        `normalizar_datos_aemet()` translates AEMET's abbreviated field names into the application's canonical keys:
+
+        | AEMET field | Standard key | Notes |
+        |---|---|---|
+        | `ubi` | `ciudad` / `estacion` | Station name |
+        | `fint` | `fecha` | Observation timestamp |
+        | `ta` | `temperatura` | Air temperature, °C |
+        | `hr` | `humedad` | Relative humidity, % |
+        | `vv` | `viento` | Wind speed, km/h |
+        | `pres` | `presion` | Atmospheric pressure, hPa |
+        | `prec` | `lluvia` | Precipitation, mm (`"Ip"` → `0.0`) |
+
+        The most recent entry in the list is used when AEMET returns multiple observations.
+      </Step>
+      <Step title="alert_service evaluates thresholds">
+        The normalised dict is passed directly to `AlertService.evaluar_alertas()`. The method checks each meteorological variable against its configured thresholds and appends the matching alert codes to a list. The list is then added to the dict under the `alertas` key. See [Alert System](/architecture/alerts) for the full threshold table.
+      </Step>
+      <Step title="Record saved to JSONRepository">
+        Back in `api_controller.py`, the source tag is added and the record is persisted:
+
+        ```python api_controller.py
+        data['fuente'] = 'aemet'
+        guardar_registro(data)
+        ```
+
+        `JSONRepository.guardar()` appends the dict to `data/registros_climaticos.json`, creating the file if it does not already exist.
+      </Step>
+      <Step title="JSON response returned to the browser">
+        The controller returns the normalised dict — including alerts — as a JSON HTTP response. JavaScript on the page reads the fields (`ciudad`, `temperatura`, `humedad`, `viento`, `presion`, `lluvia`, `alertas`) and updates the DOM without triggering a page reload.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Manual Entry">
+    <Steps>
+      <Step title="User fills the registration form">
+        The user navigates to `/registro` and enters measurement data: date, municipality, linked AEMET station, temperature, humidity, wind speed, and rainfall.
+      </Step>
+      <Step title="Form is submitted to the API">
+        The browser posts the form data to:
+
+        ```http
+        POST /api/registrar
+        ```
+      </Step>
+      <Step title="Validators check every field">
+        `utils/validators.py` enforces business-rule constraints before any data is written:
+
+        - Temperature must be between −50 °C and 60 °C
+        - Humidity must be between 0% and 100%
+        - Wind and rainfall must be ≥ 0
+        - Date and municipality fields must be present
+
+        If validation fails the controller returns an error response and nothing is persisted.
+      </Step>
+      <Step title="Valid records are saved to both storage backends">
+        Passing records are written in two places to ensure redundancy:
+
+        1. **JSON file** — appended to `data/registros_climaticos.json` via `JSONRepository`
+        2. **SQLite database** — inserted into `clima.db` via `SQLiteRepository`
+
+        Both writes use the same normalised dict, so filtering and querying work identically regardless of which backend is queried.
+      </Step>
+      <Step title="Record tagged with fuente: 'manual'">
+        The record is stored with `fuente: "manual"`. This tag allows the historical query view (`/consulta`) and the comparison module (`/comparar`) to distinguish user-submitted readings from official AEMET observations when filtering or computing deltas. Records fetched automatically by the background scheduler are tagged `fuente: "automatico"` — a separate third value distinct from both `"manual"` and `"aemet"`.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>

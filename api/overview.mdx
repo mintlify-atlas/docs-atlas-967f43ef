@@ -1,0 +1,45 @@
+---
+title: "ClimApp API Overview"
+description: "Explore ClimApp's REST API for Madrid weather data — real-time AEMET integration, manual record storage, historical queries, and comparative analysis."
+---
+
+ClimApp exposes a set of HTTP endpoints that power the Madrid weather dashboard. Some routes return rendered HTML pages, while the `/api/*` endpoints return JSON and are suitable for programmatic access. All JSON responses from the `/api/clima` endpoint are normalized through the AEMET data pipeline and include an automated alert evaluation before being persisted to the local record store.
+
+## Route reference
+
+| Method     | Path                | Description                                      |
+|------------|---------------------|--------------------------------------------------|
+| GET        | `/`                 | Dashboard — main weather overview page           |
+| GET        | `/login`            | Login page                                       |
+| GET        | `/registro`         | Manual climate data entry form                   |
+| POST       | `/api/registrar`    | Save a new manual climate record (JSON body)     |
+| GET / POST | `/consulta`         | Query and filter historical climate records      |
+| GET / POST | `/comparar`         | Compare stored records against live AEMET data   |
+| GET        | `/api/clima`        | Real-time weather data by GPS coordinates (JSON) |
+| GET        | `/api`              | API information page                             |
+| POST       | `/login`            | Authenticate a user and open a session           |
+| POST       | `/registro_usuario` | Register a new user account                      |
+| GET        | `/logout`           | End the current user session                     |
+
+## Endpoint pages
+
+<CardGroup cols={2}>
+  <Card title="GET /api/clima" icon="cloud-sun" href="/api/get-climate">
+    Fetch real-time weather for any coordinate pair from the AEMET network.
+  </Card>
+  <Card title="POST /api/registrar" icon="floppy-disk" href="/api/register-record">
+    Submit a manual climate record and receive instant alert evaluation.
+  </Card>
+  <Card title="GET /consulta" icon="magnifying-glass" href="/api/query-history">
+    Filter stored historical records by municipality and date.
+  </Card>
+  <Card title="POST /comparar" icon="chart-bar" href="/api/compare">
+    Compare a stored manual record against the current AEMET reading.
+  </Card>
+  <Card title="POST /login" icon="lock" href="/api/auth-login">
+    Authenticate with ClimApp and establish a session cookie.
+  </Card>
+  <Card title="POST /registro_usuario" icon="user-plus" href="/api/auth-register">
+    Create a new ClimApp account with email and password.
+  </Card>
+</CardGroup>

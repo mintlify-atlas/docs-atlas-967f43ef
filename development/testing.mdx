@@ -1,0 +1,62 @@
+---
+title: "Running the ClimApp Test Suite"
+description: "Run ClimApp's pytest suite to verify validators, services, repositories, and controllers before committing or deploying changes."
+---
+
+ClimApp uses [pytest](https://docs.pytest.org/) for automated testing. The suite is configured via `pytest.ini` to discover all tests under the `tests/` directory and to set the project root on the Python path, so imports resolve correctly without any additional setup.
+
+## Running the tests
+
+To run the full suite with verbose output:
+
+```bash
+pytest -v
+```
+
+To run a single test file in isolation:
+
+```bash
+pytest tests/test_validators.py -v
+```
+
+## Recommended workflow
+
+<Steps>
+  <Step title="Install dependencies">
+    Make sure your virtual environment is active and all packages from `requirements.txt` are installed before running tests.
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Run the full suite">
+    Execute all tests from the project root. pytest reads `pytest.ini` automatically and scans the `tests/` directory.
+
+    ```bash
+    pytest -v
+    ```
+  </Step>
+  <Step title="Run a specific file">
+    When working on a particular module, target its test file directly to keep feedback fast.
+
+    ```bash
+    pytest tests/test_validators.py -v
+    ```
+  </Step>
+  <Step title="Review and fix failures">
+    pytest prints a summary of failures at the end of the run. Fix the reported assertions, then re-run the affected file to confirm the fix before running the full suite again.
+  </Step>
+</Steps>
+
+## Test files
+
+The `tests/` directory contains the following test modules:
+
+| File | What it covers |
+|---|---|
+| `test_validators.py` | Unit tests for all functions in `utils/validators.py`: numeric coercion, date format acceptance, and per-field range validation, plus the `validate_weather_data()` integration function. |
+| `test_services.py` | Business-logic layer tests covering `WeatherAPIService`, `NormalizerService`, `AlertService`, and `RetryService`. |
+| `test_normalizer.py` | Tests that `NormalizerService` correctly transforms raw AEMET API responses into the internal `RegistroClimatico` model format. |
+| `test_api_service.py` | Tests for the AEMET double-handshake request flow, including retry behaviour and handling of temporary download URLs. |
+| `test_json_repository.py` | Tests for `JSONRepository` read/write operations against the `/data` folder, including edge cases for missing or malformed files. |
+| `test_compare_controller.py` | Integration tests for the `/comparar` module, verifying that temperature, humidity, wind, and rainfall differentials are computed correctly between manual records and AEMET reference data. |

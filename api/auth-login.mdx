@@ -1,0 +1,54 @@
+---
+title: "POST /login — Authenticate with ClimApp"
+description: "Submit your email and password to start a ClimApp session. On success a server-side session cookie is set and you are redirected to the dashboard."
+---
+
+ClimApp uses server-side session authentication. When you submit valid credentials to `POST /login`, the server stores your email in the session under the key `usuario` and issues a signed session cookie. Subsequent requests from the same browser include that cookie automatically, giving you access to protected views. There is no token to manage — authentication state lives entirely in the session.
+
+## Request
+
+```http
+POST /login
+Content-Type: application/x-www-form-urlencoded
+```
+
+<ParamField body="email" type="string" required>
+  The email address associated with your ClimApp account. Must match a registered address exactly (case-sensitive).
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Your account password. Minimum 6 characters. Passwords are stored as SHA-256 hashes; the plaintext value is never persisted.
+</ParamField>
+
+### Example request
+
+```bash
+curl -c cookies.txt -X POST "http://localhost:5000/login" \
+  -d "email=user@example.com&password=secret123"
+```
+
+The `-c cookies.txt` flag saves the session cookie so subsequent `curl` requests can include it with `-b cookies.txt`.
+
+## Response
+
+ClimApp responds with an HTTP redirect in both the success and failure cases. Inspect the `Location` header to determine the outcome.
+
+### Success
+
+- **HTTP `302`** redirect to `/` (the dashboard).
+- The `Set-Cookie` response header contains the signed session cookie.
+- A flash message with category `"success"` is queued: `"Login correcto."`.
+
+### Failure — invalid credentials
+
+- **HTTP `302`** redirect back to `/login`.
+- A flash message with category `"error"` is queued: `"Email o contraseña incorrectos."`.
+- No session cookie is set.
+
+<Note>
+  Session cookies are HTTP-only and signed by Flask's secret key. Do not attempt to forge or decode them manually — Flask will reject any tampered cookie automatically.
+</Note>
+
+<Tip>
+  To end a session, send a `GET` request to `/logout`. The server removes the `usuario` key from the session and redirects you to the dashboard.
+</Tip>

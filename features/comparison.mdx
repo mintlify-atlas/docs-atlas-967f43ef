@@ -1,0 +1,64 @@
+---
+title: "Compare Your Logged Measurements Against Live AEMET Data"
+description: "Side-by-side audit of your stored manual measurements against live AEMET data to see how closely your home station matches the official sensors."
+---
+
+The `/comparar` page lets you hold your own recorded measurements up against what AEMET's network currently reports for the same location. This is the primary tool for validating the accuracy of a home weather station or any field observation you have logged in ClimApp.
+
+## Running a comparison
+
+<Steps>
+  <Step title="Open the comparison page">
+    Navigate to `/comparar`. The page loads with an empty form and no results displayed.
+  </Step>
+  <Step title="Enter a municipality">
+    Type the name of the municipality you want to compare. This field is required — submitting the form without it returns an error message asking you to provide one.
+  </Step>
+  <Step title="Optionally specify a date">
+    If you leave the date field blank, ClimApp looks for a manual record dated today. Enter a date in the date picker if you want to compare against a specific past day. The value is sent as `YYYY-MM-DD` and converted internally to `DD/MM/YYYY`.
+  </Step>
+  <Step title="Submit and review">
+    ClimApp finds your most recent manual record for that municipality and date, fetches the current AEMET reading for the linked station, and displays both side by side along with the absolute difference for each parameter.
+  </Step>
+</Steps>
+
+## What the results show
+
+When a matching record is found, the comparison page displays three sections:
+
+<CardGroup cols={3}>
+  <Card title="Your record" icon="pencil">
+    The stored manual entry for the selected municipality and date, including all weather parameters and the linked AEMET station ID.
+  </Card>
+  <Card title="AEMET reading" icon="satellite-dish">
+    The live data fetched in real time from the AEMET station linked to your record, labelled `AEMET (Oficial)`.
+  </Card>
+  <Card title="Deviations" icon="chart-bar">
+    The absolute difference between the two readings for each parameter.
+  </Card>
+</CardGroup>
+
+## Deviation thresholds
+
+ClimApp flags a comparison as having a **discrepancy** when any deviation exceeds these limits:
+
+| Parameter | Discrepancy threshold |
+|---|---|
+| `temperatura` | > 3 °C |
+| `humedad` | > 10 % |
+| `viento` | > 10 km/h |
+| `lluvia` | > 5 mm |
+
+Deviations are always absolute values (never negative), so a 3.4 °C difference is shown as `3.4` regardless of which reading is higher. If no threshold is exceeded, the comparison is considered within normal variation. If one or more thresholds are exceeded, the result is flagged with `hay_discrepancia: true` so you can investigate the source of the difference.
+
+## Alert comparison
+
+Both the manual record and the AEMET reading are independently passed through the alert engine (`AlertService`). This means the two `alertas` arrays in the results may differ — for example, your station might report a temperature that triggers `NARANJA_CALOR` while the AEMET sensor at the same station does not, or vice versa. These differences can themselves be a useful signal when checking calibration.
+
+## Why this is useful
+
+Home weather stations and manual observations can drift over time due to sensor placement, calibration, or environmental factors. Running a comparison against AEMET's official network gives you a concrete, quantified way to detect when your readings are starting to diverge from the reference — and by how much.
+
+<Note>
+  The comparison requires at least one manual record stored for the requested municipality and date. If no matching `fuente: "manual"` record exists, the page will display an error message instead of results. Log a reading first through the `/registro` form, then return here to compare it.
+</Note>

@@ -1,0 +1,58 @@
+---
+title: "ClimApp Layered Architecture Overview"
+description: "A tour of ClimApp's six-layer design, from Jinja2 templates down through controllers, services, repositories, models, and utilities."
+---
+
+ClimApp is organized as a strict layered architecture where each tier has a single, well-defined responsibility. Requests enter through the HTTP layer, travel down through controllers and services, and finally reach the persistence layer — with data flowing back up in the opposite direction. This separation means each layer can be changed, tested, or replaced without breaking adjacent tiers.
+
+## Layers at a glance
+
+<CardGroup cols={2}>
+  <Card title="Templates (Presentation)" icon="browser">
+    Jinja2 HTML views rendered by Flask. The six templates are `index.html` (real-time dashboard), `comparar.html` (AEMET vs. manual comparison), `consulta.html` (historical query), `login.html`, `registro.html`, and `api.html`. None contain business logic — they only display data passed by a controller.
+  </Card>
+  <Card title="Controllers" icon="sliders">
+    Flask Blueprints that translate HTTP requests into service calls and return responses. `view_controller` (view_bp) serves HTML pages, `auth_controller` (auth_bp) manages login and registration sessions, `api_controller` (api_bp) exposes the JSON weather endpoints, `manual_controller` (manual_bp) handles manual data entry, and `scheduler_controller` wires up background jobs.
+  </Card>
+  <Card title="Services" icon="gear">
+    The business-logic tier, holding all computation that is independent of HTTP or storage concerns. `WeatherAPIService` connects to AEMET, `NormalizerService` maps raw API fields to the application's standard format, `AlertService` evaluates meteorological thresholds, `RetryService` provides fault-tolerant HTTP sessions with exponential back-off, and `LoggingService` writes structured entries to `logs/app.log`.
+  </Card>
+  <Card title="Repositories" icon="database">
+    Data-access objects that abstract storage details away from services. `JSONRepository` reads and writes `data/registros_climaticos.json`, providing filtering by municipality, date, and source. `SQLiteRepository` manages the relational `clima.db` database used for manual records and user accounts.
+  </Card>
+  <Card title="Models" icon="cube">
+    Plain Python classes that define the data structures passed between layers. `RegistroClimatico` holds a weather observation (station, date, temperature, humidity, wind, rain). `Usuario` represents an authenticated user (email and password). `Zona` maps a Madrid municipality to its official AEMET station via INE code and station reference.
+  </Card>
+  <Card title="Utils" icon="wrench">
+    Cross-cutting helpers with no layer affiliation. `validators.py` enforces business-rule ranges before records are persisted (temperature −50 to 60 °C, humidity 0–100%, non-negative wind and rain). `datetime_utils.py` handles date formatting and parsing. `helpers.py` provides the Haversine distance formula used by `WeatherAPIService` to locate the nearest weather station.
+  </Card>
+</CardGroup>
+
+## How requests flow through the layers
+
+A typical browser request follows a straight path downward through the stack:
+
+1. **HTTP → Controller** — Flask routes the incoming request to the matching Blueprint handler in `controllers/`.
+2. **Controller → Service** — The controller calls one or more services, passing only validated, typed arguments.
+3. **Service → Repository** — If data needs to be read or written, the service delegates to a repository.
+4. **Repository → Storage** — The repository performs the actual file or database operation and returns Python objects.
+5. **Back up the stack** — Each layer returns its result to the caller above; the controller serialises the final value as JSON or an HTML response.
+
+Utils may be called from any layer. Models travel freely between layers as lightweight data carriers — they are never tied to a specific tier.
+
+## Flask Blueprints
+
+Flask Blueprints give each controller its own isolated routing namespace. `app.py` registers all four at startup:
+
+```python app.py
+app.register_blueprint(view_bp)    # HTML pages — index, consulta, comparar
+app.register_blueprint(manual_bp)  # Manual data entry routes
+app.register_blueprint(auth_bp)    # Login and user registration
+app.register_blueprint(api_bp)     # JSON API — /api/clima, /api/registrar
+```
+
+This means route definitions, error handlers, and template folders can be colocated inside each controller file without polluting the global application namespace.
+
+<Note>
+ClimApp uses **Flask-APScheduler** to run a background job every two hours. The `init_scheduler()` function in `scheduler_controller.py` registers `job_clima_auto`, which silently calls `WeatherAPIService` for Madrid's coordinates (40.4167, −3.7033) and persists the result with `fuente: "automatico"`. This ensures the historical archive grows even when no users are active.
+</Note>

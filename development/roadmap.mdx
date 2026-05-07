@@ -1,0 +1,57 @@
+---
+title: "Planned Features and Development Roadmap"
+description: "Upcoming ClimApp features under consideration: PostgreSQL migration, Chart.js dashboards, AI predictive models, and PDF/Excel export."
+---
+
+ClimApp is actively developed and a number of significant features are planned for future releases. The items below represent the current direction of the project based on the public roadmap. They are design goals, not commitments, and the implementation order or scope may change as the project evolves.
+
+<Note>
+  None of the features described on this page are implemented yet. They are planned additions to a future version of ClimApp.
+</Note>
+
+<AccordionGroup>
+  <Accordion title="PostgreSQL migration">
+    ClimApp currently persists data in a local SQLite database (`clima.db`) and JSON files under `/data`. While this works well for development and single-user deployments, it does not scale to multi-user or production environments.
+
+    The planned migration replaces SQLite with **PostgreSQL**, providing:
+
+    - Concurrent write support for multiple users recording weather data simultaneously.
+    - Production-grade durability and backup tooling.
+    - Compatibility with managed cloud database services.
+
+    The repository layer (`sqlite_repository.py`, `json_repository.py`) is already abstracted, which means the migration can be introduced without changes to the service or controller layers.
+  </Accordion>
+
+  <Accordion title="Chart.js interactive dashboard">
+    The current `/consulta` view presents historical records in a plain table. The planned dashboard adds **Chart.js** visualisations directly in the browser, allowing users to explore trends over time without exporting data.
+
+    Planned chart types include:
+
+    - Line charts for temperature, humidity, and wind speed over a selected date range.
+    - Bar charts for accumulated rainfall per day or week.
+    - Overlay views that plot manual records alongside AEMET reference values for quick visual comparison.
+
+    No server-side changes are required for this feature — the charts will consume the existing `/api/clima` and `/consulta` endpoints.
+  </Accordion>
+
+  <Accordion title="AI predictive models">
+    ClimApp records historical weather data and compares it against AEMET official readings. The planned AI feature builds on this dataset to generate short-term predictions and anomaly alerts.
+
+    Areas under consideration:
+
+    - Predicting temperature spikes or frost events based on recent trends stored in `clima.db`.
+    - Detecting when a user's manual readings deviate significantly from historical norms for their municipality.
+    - Generating early warnings before the thresholds used by the existing `AlertService` are reached.
+
+    Implementation will depend on the volume of data available after the PostgreSQL migration provides a stable, queryable history.
+  </Accordion>
+
+  <Accordion title="PDF and Excel export">
+    Users who run personal weather stations need to share or archive their data outside the application. The planned export feature adds download buttons to the `/consulta` view that generate:
+
+    - **PDF reports** with a formatted summary of filtered records, including alert flags.
+    - **Excel spreadsheets** containing the raw data columns for further analysis in external tools.
+
+    Both formats will respect the same municipality and date filters already available in the consultation interface, so users export exactly the records they are viewing.
+  </Accordion>
+</AccordionGroup>

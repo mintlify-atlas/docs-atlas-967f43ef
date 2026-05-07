@@ -1,0 +1,64 @@
+---
+title: "Browse and Filter Stored Historical Weather Records"
+description: "Explore all saved weather records in one place — filter by municipality, date, or both to review past conditions from manual logs and AEMET auto-saves."
+---
+
+The `/consulta` page gives you a full view of every weather record stored in ClimApp. Whether the data came from your own manual entries or was automatically saved when you looked up live AEMET conditions, all of it appears here in a searchable table.
+
+## Navigating to the history view
+
+Open `/consulta` in your browser. On first load, the page displays every record in the system with no filters applied — newest records appear last, in the order they were saved.
+
+## Filtering your records
+
+Use the filter form at the top of the page to narrow the results. Both filters are optional and can be used together or independently.
+
+<Tabs>
+  <Tab title="Filter by municipality">
+    Type a municipality name in the **Municipio** field. The search is case-insensitive and matches partial strings — entering `mad` will match `Madrid`. Records are compared using lowercase on both sides.
+
+    Leave this field blank to include records from all municipalities.
+  </Tab>
+  <Tab title="Filter by date">
+    Enter a date in the **Fecha** field. The date picker sends the value in `YYYY-MM-DD` format, which the server converts internally to `DD/MM/YYYY` for matching against stored records.
+
+    Leave this field blank to include records from all dates.
+  </Tab>
+</Tabs>
+
+After submitting the form, the page reloads and shows only the records that match your criteria.
+
+## What each record shows
+
+Each row in the results table displays the full set of weather parameters for that observation:
+
+| Column | Description |
+|---|---|
+| `fecha` | Date of the observation in `DD/MM/YYYY` format |
+| `municipio` | Municipality where the reading was taken |
+| `estacion_id` | AEMET station linked to the record |
+| `temperatura` | Temperature in °C |
+| `humedad` | Relative humidity in % |
+| `viento` | Wind speed in km/h |
+| `lluvia` | Precipitation in mm |
+| `fuente` | Origin of the record: `manual` or `aemet` |
+
+## Record sources
+
+Records in the history view come from three origins, identified by the `fuente` field:
+
+<CardGroup cols={3}>
+  <Card title="Manual entries" icon="pencil">
+    Records you submitted through the `/registro` form. These are tagged `fuente: "manual"` and represent your own measurements.
+  </Card>
+  <Card title="Live AEMET lookups" icon="satellite-dish">
+    Records saved automatically when you request real-time weather via the dashboard. These are tagged `fuente: "aemet"` and represent the live station reading at the moment of your query.
+  </Card>
+  <Card title="Scheduled background fetches" icon="clock">
+    Records collected automatically every two hours by the background scheduler for Madrid's coordinates. These are tagged `fuente: "automatico"` and build up the historical archive even when no users are active.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Leave both filter fields blank and submit the form to see every record in the system. This is a quick way to get an overview of all saved data before deciding which municipality or date to investigate further.
+</Tip>

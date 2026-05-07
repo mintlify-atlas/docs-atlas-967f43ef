@@ -1,0 +1,64 @@
+---
+title: "POST /registro_usuario — Create an Account"
+description: "Register a new ClimApp account with a unique email address and a password of at least six characters. On success you are redirected to the login page."
+---
+
+Submitting `POST /registro_usuario` creates a new user account in ClimApp's JSON-backed user store. The server validates the email format, enforces a minimum password length, checks that the two password fields match, and verifies that the email address has not already been registered. Passwords are hashed with SHA-256 before storage — the plaintext value is discarded immediately after hashing and is never written to disk.
+
+## Request
+
+```http
+POST /registro_usuario
+Content-Type: application/x-www-form-urlencoded
+```
+
+<ParamField body="email" type="string" required>
+  Email address for the new account. Must match the pattern `user@domain.tld`. Validation is performed with the regex `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`. Must be unique — submitting an address that already exists returns an error.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Desired password. Minimum 6 characters. Stored as a SHA-256 hash.
+</ParamField>
+
+<ParamField body="confirm_password" type="string" required>
+  Repeat of the desired password. Must be identical to `password`. The check is performed before any other validation; a mismatch returns an error immediately.
+</ParamField>
+
+### Example request
+
+```bash
+curl -X POST "http://localhost:5000/registro_usuario" \
+  -d "email=newuser@example.com&password=secure123&confirm_password=secure123"
+```
+
+## Response
+
+The endpoint always responds with an HTTP redirect. Check the `Location` header and any queued flash messages to determine the outcome.
+
+### Success
+
+- **HTTP `302`** redirect to `/login`.
+- Flash message with category `"success"`: `"Registro completado con éxito."`.
+
+### Failure — passwords do not match
+
+- **HTTP `302`** redirect back to `/registro_usuario` (the registration form).
+- Flash message with category `"error"`: `"Las contraseñas no coinciden."`.
+
+### Failure — invalid email or short password
+
+- **HTTP `302`** redirect back to `/registro_usuario`.
+- Flash message with category `"error"` containing the specific validation message, for example: `"El formato del email no es válido."` or `"La contraseña debe tener al menos 6 caracteres."`.
+
+### Failure — email already registered
+
+- **HTTP `302`** redirect back to `/registro_usuario`.
+- Flash message with category `"error"`: `"Este correo ya está registrado."`.
+
+<Warning>
+  Email addresses are the unique identifier for each account. There is no account-recovery flow — if you lose access to your email or forget your password, you will need to register again with a different address.
+</Warning>
+
+<Note>
+  After a successful registration you are redirected to `/login` but are not logged in automatically. Submit your credentials to `POST /login` to start a session.
+</Note>

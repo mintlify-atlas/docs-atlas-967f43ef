@@ -1,0 +1,41 @@
+---
+title: "ClimApp: Real-Time Weather Monitoring for Madrid"
+description: "ClimApp connects to AEMET OpenData to deliver live meteorological data, manual logging, historical records, and side-by-side comparisons for Madrid."
+---
+
+ClimApp is a Flask-based web application built for precise meteorological monitoring across the Community of Madrid. It integrates directly with the official AEMET OpenData API to retrieve live weather observations, then uses the Haversine formula to match your GPS coordinates with the nearest official monitoring station — delivering temperature, humidity, wind speed, atmospheric pressure, precipitation, and critical alerts in one unified interface.
+
+Beyond live queries, ClimApp is designed for users who collect their own measurements. Whether you operate a home weather station or log readings manually, the platform lets you store, review, and audit your data against AEMET's official figures. The result is a practical tool for citizens, researchers, and meteorology enthusiasts who need both real-time awareness and a reliable record of past conditions.
+
+## Core features
+
+<CardGroup cols={2}>
+  <Card title="Real-time weather" icon="cloud-sun" href="/features/real-time-weather">
+    Geolocates your position and retrieves live data from the nearest AEMET station, including temperature extremes, humidity, wind, pressure, and precipitation.
+  </Card>
+  <Card title="Manual logging" icon="pen-to-square" href="/features/manual-logging">
+    Record your own measurements at `/registro`, validated against physical plausibility ranges before being saved to both JSON and SQLite storage.
+  </Card>
+  <Card title="Historical data" icon="clock-rotate-left" href="/features/historical-data">
+    Browse and filter every stored observation at `/consulta` by municipality or date, with full alert history included in the results.
+  </Card>
+  <Card title="AEMET comparison" icon="scale-balanced" href="/features/comparison">
+    Audit your manual readings against official AEMET data at `/comparar`, with per-variable deviation shown for temperature, humidity, wind, and rainfall.
+  </Card>
+</CardGroup>
+
+## Architecture
+
+ClimApp follows a strict layered architecture — controllers handle routing, services own business logic, repositories abstract storage, and models define the data structures that flow between them.
+
+<CardGroup cols={3}>
+  <Card title="Architecture overview" icon="diagram-project" href="/architecture/overview">
+    Controllers, services, repositories, models, and utils — how the layers fit together.
+  </Card>
+  <Card title="Data flow" icon="arrow-right-arrow-left" href="/architecture/data-flow">
+    The double-request AEMET handshake, Haversine station matching, normalization, and persistence pipeline.
+  </Card>
+  <Card title="Alerts" icon="triangle-exclamation" href="/architecture/alerts">
+    Six threshold-based alert levels from frost and high humidity to red heat warnings and strong wind.
+  </Card>
+</CardGroup>

@@ -1,0 +1,82 @@
+---
+title: "Alert System: Thresholds and Risk Levels"
+description: "How AlertService evaluates normalized weather readings against fixed thresholds to produce severity codes, from ROJA_CALOR down to VERDE."
+---
+
+Every weather record that flows through ClimApp is automatically evaluated against a set of meteorological risk thresholds before it is saved or returned to the browser. This evaluation is handled by `AlertService` in `services/alert_service.py` and produces a list of human-readable alert codes that the frontend can display directly.
+
+## How alert evaluation works
+
+`AlertService.evaluar_alertas()` accepts a single argument: a normalized weather dictionary produced by `NormalizerService`. It reads four keys from that dictionary — `temperatura`, `viento`, `lluvia`, and `humedad` — and compares each value against the thresholds below. Alert codes from different variables can coexist in the same response; for example, a record can simultaneously carry `NARANJA_CALOR` and `NARANJA_VIENTO`.
+
+If the data dictionary fails the `validate_weather_data()` check in `utils/validators.py`, the method returns an empty list immediately and skips all threshold comparisons. Likewise, if any value cannot be cast to `float`, the method returns an empty list rather than raising an exception.
+
+## Alert codes and thresholds
+
+The table below lists every alert code that `AlertService` can emit, in priority order within each variable group.
+
+| Alert code | Variable | Condition |
+|---|---|---|
+| `ROJA_CALOR` | Temperature | ≥ 40 °C |
+| `NARANJA_CALOR` | Temperature | ≥ 35 °C and < 40 °C |
+| `ROJA_FRIO` | Temperature | ≤ −5 °C |
+| `NARANJA_FRIO` | Temperature | ≤ 0 °C and > −5 °C |
+| `ROJA_VIENTO` | Wind speed | > 70 km/h |
+| `NARANJA_VIENTO` | Wind speed | > 40 km/h and ≤ 70 km/h |
+| `ROJA_LLUVIA` | Rainfall | > 30 mm |
+| `NARANJA_LLUVIA` | Rainfall | > 10 mm and ≤ 30 mm |
+| `NARANJA_HUMEDAD` | Humidity | ≥ 90% |
+| `VERDE` | — | No other condition met |
+
+Temperature uses `elif` branches, so only one temperature code is ever emitted per record. Wind and rainfall behave the same way. Humidity has only a single threshold — there is no `ROJA_HUMEDAD` level. All four variable checks run independently, which means the `alertas` list can contain at most one temperature code, one wind code, one rainfall code, and one humidity code at the same time.
+
+## Example API response
+
+The `alertas` field is included directly in the JSON object returned by `GET /api/clima`. The example below shows a hot-day scenario where temperature breaches the 35 °C orange threshold but does not reach 40 °C:
+
+```json
+{
+  "ciudad": "Madrid-Cuatro Vientos",
+  "estacion": "Madrid-Cuatro Vientos",
+  "fecha": "2026-05-07T14:00:00",
+  "temperatura": 37.5,
+  "humedad": 45,
+  "viento": 25.0,
+  "presion": 1012.0,
+  "lluvia": 0.0,
+  "alertas": ["NARANJA_CALOR"],
+  "fuente": "aemet"
+}
+```
+
+A record with no risk conditions returns:
+
+```json
+{
+  "ciudad": "Madrid-Retiro",
+  "estacion": "Madrid-Retiro",
+  "fecha": "2026-05-07T09:00:00",
+  "temperatura": 18.2,
+  "humedad": 62,
+  "viento": 12.0,
+  "presion": 1018.0,
+  "lluvia": 0.0,
+  "alertas": ["VERDE"],
+  "fuente": "aemet"
+}
+```
+
+## Validation before evaluation
+
+`validate_weather_data()` runs as the first line of `evaluar_alertas()`. Invalid data — such as a record missing required fields or containing out-of-range values — causes the method to return `[]` rather than emitting misleading alert codes. This ensures that only structurally sound, physically plausible readings are ever classified.
+
+```python alert_service.py
+def evaluar_alertas(self, registro_normalizado: Dict[str, Any]) -> List[str]:
+    if not validate_weather_data(registro_normalizado):
+        return []
+    # threshold checks follow ...
+```
+
+<Tip>
+`VERDE` is not a default fallback applied blindly — it is only appended when the `alertas` list is still empty after all four variable checks have completed. A record carrying `VERDE` means every measured variable is within safe operating ranges.
+</Tip>

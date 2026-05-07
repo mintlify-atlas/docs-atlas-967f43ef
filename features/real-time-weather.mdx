@@ -1,0 +1,95 @@
+---
+title: "Real-Time Weather Data from the Nearest AEMET Station"
+description: "View live temperature, humidity, wind, pressure, and precipitation data for your exact location, pulled directly from the nearest official AEMET station."
+---
+
+When you open ClimApp, the dashboard at `/` automatically requests your browser's geolocation. Once you grant permission, your GPS coordinates are sent to the backend, which locates the closest official AEMET weather station and displays its live readings — all without a page reload.
+
+## What you see on the dashboard
+
+The dashboard shows the following meteorological values, updated each time the page fetches your location:
+
+<CardGroup cols={2}>
+  <Card title="Temperature" icon="thermometer">
+    Current air temperature in degrees Celsius, sourced from the `ta` field in the AEMET observation.
+  </Card>
+  <Card title="Humidity" icon="droplets">
+    Relative humidity as a percentage, sourced from the `hr` field.
+  </Card>
+  <Card title="Wind speed" icon="wind">
+    Wind speed in km/h, sourced from the `vv` field.
+  </Card>
+  <Card title="Atmospheric pressure" icon="gauge">
+    Pressure in hPa, sourced from the `pres` field.
+  </Card>
+  <Card title="Precipitation" icon="cloud-rain">
+    Accumulated rainfall in mm, sourced from the `prec` field. Trace amounts reported by AEMET as `ip` are displayed as 0.0 mm.
+  </Card>
+  <Card title="Alerts" icon="triangle-exclamation">
+    Any active meteorological alerts evaluated from the live reading, such as `ROJA_CALOR` or `NARANJA_VIENTO`.
+  </Card>
+</CardGroup>
+
+## How your nearest station is found
+
+ClimApp uses the **Haversine formula** to calculate the straight-line distance (in kilometres, accounting for the Earth's curvature) between your GPS coordinates and every active AEMET station. The station with the smallest distance is selected and its observation is returned.
+
+```python
+# utils/helpers.py — Haversine distance calculation
+a = (
+    math.sin(dlat / 2) ** 2 +
+    math.cos(lat1 * rad) *
+    math.cos(lat2 * rad) *
+    math.sin(dlon / 2) ** 2
+)
+c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+distancia = 6371 * c  # Earth radius ≈ 6371 km
+```
+
+## How AEMET delivers its data
+
+AEMET's API uses a **double-request pattern**. A single query is not enough to retrieve observations:
+
+<Steps>
+  <Step title="Send the authenticated request">
+    ClimApp calls the AEMET observations endpoint with your API key. AEMET responds with a metadata object that contains a temporary `datos` URL, not the actual weather data.
+  </Step>
+  <Step title="Download the data payload">
+    ClimApp immediately follows up with a second GET request to that temporary URL. This second response contains the full list of station observations in JSON format.
+  </Step>
+  <Step title="Find the nearest station">
+    The backend iterates over every observation, applies the Haversine formula to your coordinates, and keeps the closest result.
+  </Step>
+  <Step title="Normalize and return">
+    The raw AEMET fields are mapped to ClimApp's standard format and the result — including any active alerts — is returned to your browser as JSON.
+  </Step>
+</Steps>
+
+## API response format
+
+After normalization, the `/api/clima` endpoint returns a JSON object with the following fields:
+
+```json
+{
+  "ciudad": "RETIRO",
+  "estacion": "RETIRO",
+  "fecha": "2026-05-07T13:00:00",
+  "temperatura": 22.4,
+  "humedad": 48.0,
+  "viento": 15.2,
+  "presion": 1012.3,
+  "lluvia": 0.0,
+  "alertas": ["VERDE"],
+  "fuente": "aemet"
+}
+```
+
+The `ciudad` field is mapped from AEMET's internal `ubi` (station name) field. The `alertas` array contains one or more alert codes — `VERDE` means no thresholds were exceeded.
+
+## Retry logic for resilient connections
+
+Because AEMET's temporary data URLs can occasionally be slow to generate, ClimApp uses a `RetryService` that wraps every HTTP request in a session with automatic retries. This means transient network errors or short AEMET delays are handled transparently — you see data rather than an error.
+
+<Note>
+  This feature requires your browser to grant geolocation permission. If you deny the request or your browser blocks location access, ClimApp cannot determine your coordinates and will not be able to fetch live weather data.
+</Note>

@@ -1,0 +1,63 @@
+---
+title: "Data Validation Rules and Constraints"
+description: "All validation rules enforced by ClimApp before persisting weather records: field ranges, accepted date formats, and how validation is applied."
+---
+
+Before any weather record is written to `clima.db` or the JSON data files, ClimApp passes it through the validation layer in `utils/validators.py`. Every field in the submitted record must satisfy its rule independently. If any single field fails, `validate_weather_data()` returns `False` and the record is rejected — nothing is persisted.
+
+## Validation rules
+
+The table below lists every field, its accepted values, and the function that enforces the constraint.
+
+| Field | Constraint | Validator function |
+|---|---|---|
+| `temperatura` | Must be a number between -50 and 60 °C (inclusive) | `validar_temperatura()` |
+| `humedad` | Must be a number between 0 and 100 % (inclusive) | `validar_humedad()` |
+| `viento` | Must be a number ≥ 0 | `validar_viento()` |
+| `lluvia` | Must be a number ≥ 0 | `validar_lluvia()` |
+| `fecha` | Must match one of: `DD/MM/YYYY`, `DD-MM-YYYY`, or `YYYY-MM-DD` | `validar_fecha()` |
+
+<Note>
+  Numeric fields accept both numeric types and string representations of numbers (for example, `"22.5"` is treated the same as `22.5`). Empty strings, `None`, and non-numeric text are all rejected.
+</Note>
+
+## The `validate_weather_data()` function
+
+The integration function receives a dictionary representing a single weather record and delegates each field to its specific validator. All five validators must return `True` for the function to return `True`.
+
+```python
+def validate_weather_data(data):
+    if not data or not isinstance(data, dict):
+        return False
+
+    return all([
+        validar_fecha(data.get("fecha")),
+        validar_temperatura(data.get("temperatura")),
+        validar_humedad(data.get("humedad")),
+        validar_viento(data.get("viento")),
+        validar_lluvia(data.get("lluvia"))
+    ])
+```
+
+The guard at the top of the function catches `None` and non-dict inputs immediately, returning `False` without calling any of the individual validators. This means an empty dict (`{}`) is also rejected because `all()` over an empty list would otherwise return `True` — but each `data.get()` call would return `None`, which the individual validators reject.
+
+## Accepted date formats
+
+`validar_fecha()` strips any time component before parsing, then tries each format in order:
+
+| Format | Example |
+|---|---|
+| `DD/MM/YYYY` | `29/04/2026` |
+| `DD-MM-YYYY` | `29-04-2026` |
+| `YYYY-MM-DD` | `2026-04-29` |
+
+If the input matches none of these formats, the function returns `False` and the entire record is rejected.
+
+## Persistence behaviour
+
+All fields must pass for a record to be persisted. ClimApp writes validated records to two destinations:
+
+1. A JSON file in the `/data` directory, managed by `JSONRepository`.
+2. The `clima.db` SQLite database, managed by `SQLiteRepository`.
+
+If `validate_weather_data()` returns `False`, neither destination is written to. The calling controller is responsible for returning an appropriate error response to the user.

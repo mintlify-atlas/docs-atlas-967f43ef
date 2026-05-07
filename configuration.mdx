@@ -1,0 +1,63 @@
+---
+title: "Configure Your AEMET API Connection and Flask App"
+description: "Set up the two environment variables ClimApp requires: an AEMET OpenData API key for live weather data and a Flask secret key for session security."
+---
+
+ClimApp reads its runtime configuration from a `.env` file in the project root. At startup, `python-dotenv` loads this file and makes the values available to Flask via `os.getenv`. There are two variables you must provide: one to authenticate against the AEMET OpenData API and one to secure Flask's session cookies. Neither has a safe default for production use.
+
+<Warning>
+  Never commit your `.env` file to version control. Add `.env` to your `.gitignore` to prevent accidentally exposing your API key or secret key in a public repository.
+</Warning>
+
+## The `.env` file
+
+Create this file in the project root before running `python app.py`:
+
+```env .env
+AEMET_API_KEY=your_api_key_here
+SECRET_KEY=your_secret_key_here
+```
+
+Both values are strings. There are no additional formatting requirements — no quotes needed around values unless they contain spaces.
+
+## Variables
+
+### `AEMET_API_KEY`
+
+This key authenticates every request ClimApp makes to the AEMET OpenData API. Without a valid key the live weather endpoint returns an authorization error and real-time data will not load.
+
+**How to obtain it:** Register for a free account at [opendata.aemet.es](https://opendata.aemet.es). After email verification, the portal generates your key immediately. There are no usage tiers or payment requirements — the key grants full access to the observation endpoints ClimApp uses.
+
+ClimApp uses the key in a two-step request pattern: the first request to AEMET returns a temporary download URL, and the second request fetches the actual observation payload from that URL. The `RetryService` handles transient failures in this handshake automatically.
+
+### `SECRET_KEY`
+
+Flask uses this value to cryptographically sign session cookies. If the key is weak or predictable, an attacker could forge session data and bypass authentication.
+
+**How to generate a strong key:** Run the following command and copy the output directly into your `.env` file:
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+This produces a 64-character hexadecimal string suitable for production use. Treat it like a password — do not share it or reuse it across deployments.
+
+<Info>
+  The application ships with a fallback value of `"clave_secreta"` in `app.py`, used only when `SECRET_KEY` is absent from the environment. This fallback is intentionally weak and must never be used outside of initial local testing.
+</Info>
+
+## Verifying your configuration
+
+After creating `.env`, start the server:
+
+```bash
+python app.py
+```
+
+If `AEMET_API_KEY` is missing or invalid, the real-time weather panel will show an error when you allow location access. If `SECRET_KEY` is missing, Flask will fall back to `"clave_secreta"` and log a warning. Both issues are visible in the terminal output.
+
+To confirm everything is wired up correctly before testing manually, run the test suite:
+
+```bash
+python -m pytest
+```

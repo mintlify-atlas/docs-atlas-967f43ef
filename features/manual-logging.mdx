@@ -1,0 +1,97 @@
+---
+title: "Log and Save Your Own Personal Weather Measurements"
+description: "Enter readings from your home weather station or manual observations and save them alongside official AEMET data for later filtering and comparison."
+---
+
+ClimApp lets you record your own meteorological readings through a dedicated form at `/registro`. This is designed for users with home weather stations or anyone who wants to log field observations and later compare them against official AEMET data.
+
+## How to log a measurement
+
+Navigate to `/registro` in your browser. The form accepts the following fields:
+
+<CardGroup cols={2}>
+  <Card title="Fecha" icon="calendar">
+    Date of the measurement. The system accepts `DD/MM/YYYY`, `DD-MM-YYYY`, and `YYYY-MM-DD` formats.
+  </Card>
+  <Card title="Municipio" icon="map-pin">
+    The municipality name where the measurement was taken (e.g., `Madrid`).
+  </Card>
+  <Card title="Estación AEMET" icon="tower-broadcast">
+    The AEMET station ID associated with your location. This links your record to the nearest official station for future comparisons.
+  </Card>
+  <Card title="Temperatura" icon="thermometer">
+    Air temperature in °C. Must be between -50 and 60.
+  </Card>
+  <Card title="Humedad" icon="droplets">
+    Relative humidity as a percentage. Must be between 0 and 100.
+  </Card>
+  <Card title="Viento" icon="wind">
+    Wind speed in km/h. Must be 0 or greater.
+  </Card>
+  <Card title="Lluvia" icon="cloud-rain">
+    Precipitation in mm. Must be 0 or greater.
+  </Card>
+</CardGroup>
+
+## Validation rules
+
+Before any record is saved, every field passes through the validation layer in `utils/validators.py`. Submitting a record that fails any of these checks causes the entire record to be rejected — nothing is persisted.
+
+| Field | Rule |
+|---|---|
+| `fecha` | Must be a parseable date in a recognised format |
+| `temperatura` | Must be a number between -50 and 60 (°C) |
+| `humedad` | Must be a number between 0 and 100 (%) |
+| `viento` | Must be a number ≥ 0 (km/h) |
+| `lluvia` | Must be a number ≥ 0 (mm) |
+
+## Where your record is saved
+
+Valid records are written to two separate storage layers:
+
+<Steps>
+  <Step title="JSON file">
+    The record is appended to `data/registros_climaticos.json`. This file is used by the history and comparison features to filter and retrieve records quickly.
+  </Step>
+  <Step title="SQLite database">
+    A second copy is saved to `clima.db` through the repository layer, providing a relational backup for longer-term storage and potential future queries.
+  </Step>
+</Steps>
+
+## Example record
+
+A valid manual entry looks like this once it is stored:
+
+```json
+{
+  "estacion_id": "3129",
+  "fecha": "07/05/2026",
+  "temperatura": 21.5,
+  "humedad": 55.0,
+  "viento": 12.0,
+  "lluvia": 0.0,
+  "municipio": "Madrid",
+  "fuente": "manual"
+}
+```
+
+The `fuente` field is always set to `"manual"` for user-submitted records. This tag distinguishes them from automatically saved AEMET readings (tagged `"aemet"`) when filtering the history or running a comparison.
+
+## Alert evaluation
+
+After validation, the record is passed through `AlertService` before it is saved. If any thresholds are exceeded, the API response includes a list of alert codes:
+
+```json
+{
+  "status": "success",
+  "message": "Registro guardado con éxito",
+  "alertas": ["NARANJA_CALOR"],
+  "municipio": "Madrid"
+}
+```
+
+If no thresholds are exceeded, `alertas` contains `["VERDE"]`.
+
+<Warning>
+  Records that fail validation are rejected entirely and not saved to either the JSON file or the database. Double-check your values before submitting, especially temperature (must be between -50 °C and 60 °C) and humidity (must be between 0 % and 100 %).
+</Warning>

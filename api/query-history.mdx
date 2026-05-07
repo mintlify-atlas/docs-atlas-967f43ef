@@ -1,0 +1,65 @@
+---
+title: "GET /consulta — Query Historical Records"
+description: "Browse and filter all climate records stored by ClimApp, scoped by municipality name and observation date, with results rendered in the dashboard view."
+---
+
+The `/consulta` route displays the full archive of climate records that ClimApp has collected — both records entered manually via `/api/registrar` and readings fetched automatically from AEMET via `/api/clima`. A `GET` request returns every stored record. A `POST` request applies optional filters for municipality and date before rendering the same page with the narrowed result set. Submitting the form with both fields blank is equivalent to a plain `GET` and returns all records.
+
+## Request
+
+### GET — all records
+
+```http
+GET /consulta
+```
+
+Returns all stored records without filtering.
+
+### POST — filtered records
+
+```http
+POST /consulta
+Content-Type: application/x-www-form-urlencoded
+```
+
+<ParamField body="municipio" type="string">
+  Filter by municipality name. The match is case-insensitive and supports partial strings — entering `mad` matches `Madrid`. Leave blank to skip this filter.
+</ParamField>
+
+<ParamField body="fecha" type="string">
+  Filter by observation date. Submit the value in `YYYY-MM-DD` format (as produced by an HTML `<input type="date">`); the controller converts it internally to `DD/MM/YYYY` before querying the store. Leave blank to skip this filter.
+</ParamField>
+
+<Note>
+  Submitting the form with both `municipio` and `fecha` blank returns the complete record set, identical to a `GET` request.
+</Note>
+
+### Example — filtered request
+
+```bash
+curl -X POST "http://localhost:5000/consulta" \
+  -d "municipio=Madrid&fecha=2026-05-07"
+```
+
+## Response
+
+The endpoint renders the `consulta.html` template and is not a JSON API. The `registros` variable passed to the template is a list of record objects. Each record has the following structure:
+
+```json
+{
+  "estacion_id": "EST-001",
+  "fecha": "07/05/2026",
+  "temperatura": 28.5,
+  "humedad": 62.0,
+  "viento": 15.0,
+  "lluvia": 0.0,
+  "municipio": "Madrid",
+  "fuente": "manual"
+}
+```
+
+Records originating from AEMET (fetched via `/api/clima`) carry `"fuente": "aemet"` and include additional fields such as `ciudad`, `estacion`, `presion`, and `alertas`.
+
+<Tip>
+  Use the `fuente` field to distinguish manually entered observations (`"manual"`) from AEMET live readings (`"aemet"`) when processing the results programmatically.
+</Tip>

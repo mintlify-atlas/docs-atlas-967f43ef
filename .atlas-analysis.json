@@ -1,0 +1,91 @@
+{
+  "projectType": "saas",
+  "projectName": "ClimApp",
+  "projectDescription": "A Flask-based web application for real-time meteorological monitoring in Madrid, integrating AEMET OpenData to provide weather data, manual data logging, historical queries, and comparative analysis.",
+  "theme": "almond",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "configuration"]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/real-time-weather",
+              "features/manual-logging",
+              "features/historical-data",
+              "features/comparison"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/data-flow",
+              "architecture/alerts"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/testing",
+              "development/data-validation",
+              "development/roadmap"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/overview",
+              "api/get-climate",
+              "api/register-record",
+              "api/query-history",
+              "api/compare"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth-login",
+              "api/auth-register"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time weather data via AEMET OpenData API with GPS-based nearest station detection using the Haversine formula",
+    "Manual climate data logging with validation and dual persistence (JSON files + SQLite database)",
+    "Historical data query and filtering by municipality and date",
+    "Comparative analysis between user-recorded data and official AEMET readings",
+    "Automated alert system with color-coded severity levels (red, orange, frost, high wind, heavy rain, high humidity)",
+    "Scheduled background data fetching with retry logic for resilient API communication",
+    "User authentication system with session management and password hashing"
+  ],
+  "publicApiSurface": [
+    "GET /api/clima?lat=&lon= — Fetch real-time weather for coordinates",
+    "POST /api/registrar — Persist a new climate record",
+    "GET/POST /consulta — Query and filter historical climate records",
+    "GET/POST /comparar — Compare manual records against AEMET data",
+    "POST /login — User authentication",
+    "POST /registro_usuario — User registration",
+    "GET /logout — End user session",
+    "WeatherAPIService.obtener_clima_por_coordenadas(lat, lon)",
+    "NormalizerService.normalizar_datos_aemet(data)",
+    "AlertService.evaluar_alertas(registro_normalizado)",
+    "validate_weather_data(data)"
+  ]
+}

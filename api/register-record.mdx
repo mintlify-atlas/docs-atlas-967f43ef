@@ -1,0 +1,102 @@
+---
+title: "POST /api/registrar — Save a Climate Record"
+description: "Submit a manual climate observation as a JSON body. The record is validated, alert-evaluated, and persisted to the local JSON data store."
+---
+
+The `/api/registrar` endpoint accepts manually entered climate data as a JSON payload. On receipt the controller constructs a `RegistroClimatico` model object, which enforces numeric types on all measurement fields, then passes the record through the `AlertService` before writing it to the JSON repository. The response includes the list of alert codes active for the submitted reading, giving you immediate feedback without a separate API call.
+
+## Request
+
+```http
+POST /api/registrar
+Content-Type: application/json
+```
+
+<ParamField body="fecha" type="string" required>
+  Observation date. Accepted format: `DD/MM/YYYY`. Example: `"07/05/2026"`.
+</ParamField>
+
+<ParamField body="municipio" type="string" required>
+  Name of the municipality where the observation was taken. Example: `"Madrid"`. Defaults to `"Desconocido"` if omitted.
+</ParamField>
+
+<ParamField body="estacion_id" type="string" required>
+  Station identifier used to group records from the same sensor or observer. Example: `"EST-001"`.
+</ParamField>
+
+<ParamField body="temperatura" type="number" required>
+  Air temperature in degrees Celsius. Must be castable to `float`.
+</ParamField>
+
+<ParamField body="humedad" type="number" required>
+  Relative humidity as a percentage (0–100). Must be castable to `float`.
+</ParamField>
+
+<ParamField body="viento" type="number" required>
+  Wind speed in km/h. Must be castable to `float`.
+</ParamField>
+
+<ParamField body="lluvia" type="number" required>
+  Precipitation in mm. Must be castable to `float`. Use `0` for no rain.
+</ParamField>
+
+### Validation rules
+
+- All numeric fields (`temperatura`, `humedad`, `viento`, `lluvia`) are cast to `float` by the `RegistroClimatico` model. Supplying a non-numeric string causes a `500` error.
+- The request body must be valid JSON. A missing or non-JSON body returns a `400` error.
+- `municipio` is written to the stored record as-is; it is used as the filter key in `/consulta` and `/comparar`.
+
+### Example request
+
+```bash
+curl -X POST "http://localhost:5000/api/registrar" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fecha": "07/05/2026",
+    "municipio": "Madrid",
+    "estacion_id": "EST-001",
+    "temperatura": 28.5,
+    "humedad": 62.0,
+    "viento": 15.0,
+    "lluvia": 0.0
+  }'
+```
+
+## Response
+
+### Success — `201 Created`
+
+```json
+{
+  "status": "success",
+  "message": "Registro guardado con éxito",
+  "alertas": ["NARANJA_CALOR"],
+  "municipio": "Madrid"
+}
+```
+
+The `alertas` array contains all alert codes active for the submitted record. See the [alert code table](/api/get-climate#response) for the full list of possible values.
+
+### Error responses
+
+**`400 Bad Request`** — request body is absent or is not valid JSON.
+
+```json
+{
+  "status": "error",
+  "message": "No se recibieron datos"
+}
+```
+
+**`500 Internal Server Error`** — the repository failed to write the record, or a field could not be cast to the expected type.
+
+```json
+{
+  "status": "error",
+  "message": "Error interno: could not convert string to float: 'abc'"
+}
+```
+
+<Note>
+  Records saved via this endpoint are tagged with `"fuente": "manual"`, which lets `/consulta` and `/comparar` distinguish them from AEMET-sourced records fetched through `/api/clima`.
+</Note>

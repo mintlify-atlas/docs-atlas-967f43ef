@@ -1,0 +1,125 @@
+---
+title: "GET /api/clima — Real-Time Weather Data"
+description: "Retrieve normalized, real-time weather conditions for any coordinate pair via the AEMET network, including automated climate alert evaluation."
+---
+
+The `/api/clima` endpoint queries the AEMET observation network for the weather station nearest to the supplied coordinates. Raw AEMET data is normalized into a consistent schema — field names are standardized, numeric types are enforced, and trace-precipitation values (`ip`) are converted to `0.0`. Before the response is returned, the alert engine evaluates the record and appends a list of active alert codes. The record is also persisted automatically so it appears in historical queries.
+
+## Request
+
+```http
+GET /api/clima?lat={lat}&lon={lon}
+```
+
+<ParamField query="lat" type="string" required>
+  Latitude of the target location in decimal degrees. Example: `40.4168` for Madrid.
+</ParamField>
+
+<ParamField query="lon" type="string" required>
+  Longitude of the target location in decimal degrees. Example: `-3.7038` for Madrid.
+</ParamField>
+
+### Example request
+
+```bash
+curl "http://localhost:5000/api/clima?lat=40.4168&lon=-3.7038"
+```
+
+## Response
+
+### Success — `200 OK`
+
+<ResponseField name="ciudad" type="string">
+  Human-readable place name sourced from the AEMET `ubi` field. Falls back to `"Ubicación Detectada"` when the field is absent.
+</ResponseField>
+
+<ResponseField name="estacion" type="string">
+  AEMET station name. Identical to `ciudad` in the current normalization schema.
+</ResponseField>
+
+<ResponseField name="fecha" type="string">
+  Observation timestamp in ISO 8601 format as returned by AEMET (`fint` field). Example: `"2026-05-07T14:00:00"`.
+</ResponseField>
+
+<ResponseField name="temperatura" type="number">
+  Air temperature in degrees Celsius, sourced from the AEMET `ta` field.
+</ResponseField>
+
+<ResponseField name="humedad" type="number">
+  Relative humidity as a percentage (0–100), sourced from the AEMET `hr` field.
+</ResponseField>
+
+<ResponseField name="viento" type="number">
+  Wind speed in km/h, sourced from the AEMET `vv` field.
+</ResponseField>
+
+<ResponseField name="presion" type="number">
+  Atmospheric pressure in hPa, sourced from the AEMET `pres` field.
+</ResponseField>
+
+<ResponseField name="lluvia" type="number">
+  Precipitation in mm. Trace values (`ip`) are normalized to `0.0`, sourced from the AEMET `prec` field.
+</ResponseField>
+
+<ResponseField name="alertas" type="string[]">
+  List of active alert codes produced by the ClimApp alert engine. Returns `["VERDE"]` when no thresholds are exceeded. Possible codes:
+
+  | Code              | Condition                          |
+  |-------------------|------------------------------------|
+  | `VERDE`           | No active alerts                   |
+  | `NARANJA_CALOR`   | Temperature ≥ 35 °C                |
+  | `ROJA_CALOR`      | Temperature ≥ 40 °C                |
+  | `NARANJA_FRIO`    | Temperature ≤ 0 °C                 |
+  | `ROJA_FRIO`       | Temperature ≤ −5 °C                |
+  | `NARANJA_VIENTO`  | Wind speed > 40 km/h               |
+  | `ROJA_VIENTO`     | Wind speed > 70 km/h               |
+  | `NARANJA_LLUVIA`  | Precipitation > 10 mm              |
+  | `ROJA_LLUVIA`     | Precipitation > 30 mm              |
+  | `NARANJA_HUMEDAD` | Relative humidity ≥ 90 %           |
+</ResponseField>
+
+<ResponseField name="fuente" type="string">
+  Data source identifier. Always `"aemet"` for responses from this endpoint.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "ciudad": "Madrid - Retiro",
+  "estacion": "Madrid - Retiro",
+  "fecha": "2026-05-07T14:00:00",
+  "temperatura": 22.4,
+  "humedad": 45.0,
+  "viento": 18.0,
+  "presion": 1012.3,
+  "lluvia": 0.0,
+  "alertas": ["VERDE"],
+  "fuente": "aemet"
+}
+```
+
+### Error responses
+
+**`400 Bad Request`** — returned when `lat` or `lon` are missing from the query string.
+
+```json
+{
+  "error": "Faltan coordenadas"
+}
+```
+
+**`500 Internal Server Error`** — returned when the AEMET connection fails or data cannot be normalized.
+
+```json
+{
+  "error": "Connection timeout",
+  "temperatura": 0,
+  "ciudad": "Error de conexión",
+  "humedad": 0
+}
+```
+
+<Warning>
+  The `500` response always includes `temperatura`, `ciudad`, and `humedad` keys set to safe defaults so client-side rendering does not break on missing fields.
+</Warning>
